@@ -1,0 +1,5 @@
+require 'nytimes/movies/base'
+require 'nytimes/movies/link'
+require 'nytimes/movies/multimedia_link'
+require 'nytimes/movies/critic'
+require 'nytimes/movies/review'
