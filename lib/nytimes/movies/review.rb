@@ -12,6 +12,8 @@ module Nytimes
 			alias :movie_title :display_title
 			alias :review_title :headline
 			
+			BATCH_SIZE = 20
+			
 			def initialize(params={})
 				params.each_pair do |k,v|
 					instance_variable_set("@#{k}", v)
@@ -32,8 +34,22 @@ module Nytimes
 					hash[key] = hash[key] == 'Y'
 				end
 				
-				def date_to_query_arg(date)
+				def format_date_arg(arg)
+					return arg if arg.is_a? String
+		
+					unless arg.responds_to? :strftime
+						raise "Date argument must respond to strftime"
+					end
 					
+					arg.strftime "%Y-%m-%d"
+				end
+				
+				def date_to_query_arg(date_or_range)
+					if date_or_range.responds_to?(:first) && date_or_range.responds_to?(:last)
+						"#{format_date_arg(date_or_range.first)};#{format_date_arg(date_or_range.last)}"
+					else
+						format_date_arg(date_or_range)
+					end
 				end
 				
 				def boolean_to_query_arg(arg)
@@ -67,14 +83,55 @@ module Nytimes
 					end
 					
 					rename_hash_key hash, 'seo-name', 'seo_name'
-					
 					new hash
 				end
 				
-				def find_by_keyword(params={})
+				##
+				# Find Movie Reviews that match your parameters. Up to 3 of the following query parameters can be used in a request:
+				#  
+				# * <tt>:text</tt> - search movie title and indexed terms for the movie. To limit to exact matches, enclose parts of the query in single quotes. Otherwise, it will include include partial matches ("head words") as well as exact matches (e.g., president will match president, presidents and presidential). Multiple terms will be ORed together
+				# * <tt>:critic_pick</tt> - set to true to only search movies that are designated critics picks. Should your tastes be more lowbrow, set to false to return movies that are specifically NOT critic's picks. To get all movies, don't send this parameter at all.
+				# * <tt>:thousand_best</tt> - search only movies on the Times List of "Thousand Best Movies Ever Made". Set to false if you want to explicitly search movies not on the list. Omit if you want all movies.
+				# * <tt>:reviewer</tt> - search reviews made by a specific critic. The full-name or the SEO name can be used to specify the critic.
+				# * <tt>:publication_date</tt> - when the review was published. This can be either a single Date or Time object or a range of Times (anything that responds to .first and .last). If you'd prefer, you can also pass in a "YYYY-MM-DD" string
+				# * <tt>:opening_date</tt> - when the movie opened in theaters in the NY Metro area. See +:publication_date+ for argument times.
+        #
+				# In addition, you can also specify the following order and pagination values:
+				# * <tt>:offset</tt> - a maximum of 20 result are returned for queries. To retrieve further pages, an offset from the first result can be specified. This must be a multiple of 20. So +20+ means results +21 - 40+
+				# * <tt>:page</tt> - as a convenience, page will calculate the offset for here. This is not an API parameter and is translated into an offset.
+				# * <tt>:order</tt> - ordering for the results. The following four sorting options are available: <tt>:title</tt> (<em>ascending</em>), <tt>:publication_date</tt>, <tt>:opening_date</tt>, <tt>:dvd_release_date</tt> (<em>most recent first</em>). If you do not specify a sort order, the results will be ordered by closest match.
+				def find(in_params={})
+					params = {}
+					in_params.each_pair do |k,v|
+						params[k.to_s] = v
+					end
+					
+					if text = params.delete('text')
+						params['query'] = text
+					end
+					
+					unless params['reviewer'].nil?
+						params['reviewer'] = Critic.escape_critic_name(params['reviewer'])
+					end
+					
+					if page = params.delete('page')
+						params['offset'] = BATCH_SIZE * (page - 1)
+					end
+					
+					unless params['order'].nil?
+						params['order'] = case params['order']
+						when :title, :publication_date, :opening_date, :dvd_release_date
+							"by-#{params['order'].to_s.gsub('_', '-')}"
+						else
+							raise ArgumentError, "Order can only be :title, :publication_date, :opening_date, or :dvd_release_date"
+						end
+					end
+					
+					reply = invoke 'reviews/search', params
+					ResultSet.new(reply['num_results'], params['offset'], reply['results'])			
 				end
 				
-				def find_all(params={})
+				def find_by_type(params={})
 				end
 				
 				def find_by_reviewer(params={})
@@ -83,77 +140,3 @@ module Nytimes
 		end
 	end
 end
-
-# <review nyt_movie_id="72689">
-#    <display_title>The Big Chill</display_title>
-#    <sort_name>The Big Chill</sort_name>
-#    <mpaa_rating>R</mpaa_rating>
-#    <critics_pick>Y</critics_pick>
-#    <thousand_best>Y</thousand_best>
-#    <byline>VINCENT CANBY</byline>
-#    <headline>
-#    </headline>
-#    <summary_short>
-#    </summary_short>
-#    <publication_date>1983-09-23</publication_date>
-#    <opening_date>1983-09-28</opening_date>
-#    <dvd_release_date>1999-01-26</dvd_release_date>
-#    <date_updated>2008-11-04 03:48:35</date_updated>
-#    <seo-name>The-Big-Chill</seo-name>
-#    <link type="article">
-#       <url>
-#          http://movies.nytimes.com/movie/
-#          review?res=9507EEDD1E38F930A1575AC0A965948260
-#       </url>
-#       <suggested_link_text>
-#          Read the New York Times Review of The Big Chill
-#       </suggested_link_text>
-#    </link>
-#    <related_urls>
-#       <link type="overview">
-#          <url>
-#            http://movies.nytimes.com/movie/
-#            72689/The-Big-Chill/overview
-#          </url>
-#          <suggested_link_text>
-#            Overview of The Big Chill
-#          </suggested_link_text>
-#       </link>
-#       <link type="showtimes">
-#          <url>
-#            http://movies.nytimes.com/movie/
-#            72689/The-Big-Chill/showtimes
-#          </url>
-#          <suggested_link_text>
-#             Tickets & Showtimes for The Big Chill         
-#          </suggested_link_text>
-#       </link>
-#       <link type="awards">
-#          <url>
-#            http://movies.nytimes.com/movie/72689/
-#            The-Big-Chill/details
-#          </url>
-#          <suggested_link_text>
-#             Cast, Credits & Awards for The Big Chill
-#          </suggested_link_text>
-#       </link>
-#       <link type="community">
-#          <url>
-#            http://movies.nytimes.com/movie/72689/
-#            The-Big-Chill/rnr               
-#          </url>
-#          <suggested_link_text>
-#            Readers' Reviews of The Big Chill
-#          </suggested_link_text>
-#       </link>
-#       <link type="trailers">
-#          <url>
-#            http://movies.nytimes.com/movie/72689/
-#            The-Big-Chill/trailers
-#          </url>
-#          <suggested_link_text>
-#             Trailers & Clips for The Big Chill
-#          </suggested_link_text>
-#       </link>
-#    </related_urls>
-# </review>

@@ -10,9 +10,14 @@ module Nytimes
 			API_BASE = "/svc/#{API_NAME}/#{API_VERSION}"
 			
 			@@api_key = nil
+			@@copyright = nil
 			
 			class << self
 				# Set the API key
+				def copyright
+					@@copyright
+				end
+				
 				def api_key=(key)
 					@@api_key = key
 				end
@@ -42,7 +47,18 @@ module Nytimes
 						reply = uri.read
 						parsed_reply = JSON.parse reply
 						
-						parsed_reply['results']
+						if parsed_reply.nil?
+							# FIXME
+							raise "Empty reply returned from API"
+						end
+						
+						#case parsed_reply['status']
+						# FIXME
+						#end
+						
+						@@copyright = parsed_reply['copyright']
+						
+						parsed_reply
 					rescue OpenURI::HTTPError => e
 						if e.message =~ /^404/
 							return nil

@@ -1,19 +1,5 @@
 require File.dirname(__FILE__) + '/../../test_helper.rb'
 
-MOVIE_REVIEW_HASH =  {"dvd_release_date"=>"2008-09-16", "opening_date"=>"2008-04-18", 
-											"multimedia"=>{"resource"=>{"src"=>"http://graphics8.nytimes.com/images/2008/04/18/arts/18sword-75.jpg", "type"=>"thumbnail", "height"=>75, "width"=>75}}, 
-											"byline"=>"Stephen Holden", 
-											"nyt_movie_id"=>405736, 
-											"publication_date"=>"2008-04-18", "critics_pick"=>"Y", "sort_name"=>"Constantine's Sword", "headline"=>"", 
-											"summary_short"=>"u201cConstantineu2019s Swordu201d asks: When your core beliefs conflict with church doctrine, how far should your loyalty to the church extend?", 
-											"thousand_best"=>"N",
-											"mpaa_rating"=>"NR", 
-											"related_urls"=>[{"suggested_link_text"=>"Overview of Constantine's Sword", "url"=>"http://movies.nytimes.com/movie/405736/Constantine-s-Sword/overview", "type"=>"overview"}, {"suggested_link_text"=>"Tickets & Showtimes for Constantine's Sword", "url"=>"http://movies.nytimes.com/movie/405736/Constantine-s-Sword/showtimes", "type"=>"showtimes"}, {"suggested_link_text"=>"Cast, Credits & Awards for Constantine's Sword", "url"=>"http://movies.nytimes.com/movie/405736/Constantine-s-Sword/details", "type"=>"awards"}, {"suggested_link_text"=>"Readers' Reviews of Constantine's Sword", "url"=>"http://movies.nytimes.com/movie/405736/Constantine-s-Sword/rnr", "type"=>"community"}, {"suggested_link_text"=>"Trailers & Clips for Constantine's Sword", "url"=>"http://movies.nytimes.com/movie/405736/Constantine-s-Sword/trailers", "type"=>"trailers"}], 
-											"seo-name"=>"Constantine-s-Sword",
-											"display_title"=>"Constantine's Sword", 
-											"link"=>{"suggested_link_text"=>"Read the New York Times Review of Constantine's Sword", "url"=>"http://movies.nytimes.com/", "type"=>"article"}, 
-											"date_updated"=>"2008-08-21 12:10:38"}
-
 class TestNytimes::TestMovies::TestReview < Test::Unit::TestCase
 	include Nytimes::Movies
 	
@@ -21,6 +7,10 @@ class TestNytimes::TestMovies::TestReview < Test::Unit::TestCase
 	def setup
 		FakeWeb.clean_registry
 		FakeWeb.block_uri_pattern(Base::API_SERVER)
+	end
+	
+	def expects_invoke_arg(key, value)
+		Review.expects(:invoke).with(anything, has_entry(key, value)).returns(MOVIE_RESULT_HASH)
 	end
 	
 	context "Review.create_from_api" do
@@ -75,6 +65,71 @@ class TestNytimes::TestMovies::TestReview < Test::Unit::TestCase
 			should "parse the #{date} from the hash into a Ruby Date" do
 				assert_kind_of Date, @review.send(date)
 				assert_equal Date.parse(MOVIE_REVIEW_HASH[date]), @review.send(date)
+			end
+		end
+	end
+
+	context "Review.find" do
+		setup do
+			FakeWeb.register_uri(api_url_for('reviews/search', 'query' => 'constantine'), :string => MOVIE_RESULT_REPLY)
+		end
+		
+		should "call the reviews/search endpoint"
+		
+		should "return an instance of ResultSet" do
+			result_set = Review.find(:text => 'constantine')
+			assert_kind_of(ResultSet, result_set)
+		end
+		
+		context "input parameters" do
+			context "text" do
+			end
+			
+			context "critic_name" do
+				should "escape the Critic Name to the SEO form" do
+					expects_invoke_arg('reviewer', 'a-o-scott')
+					Review.find(:reviewer => 'A. O. Scott')
+				end
+				
+				should "not escape again if already in SEO form" do
+					expects_invoke_arg('reviewer', 'a-o-scott')
+					Review.find(:reviewer => 'A. O. Scott')
+				end
+			end
+		
+			context "page" do
+				should "set the offset to be batchsize * page-1" do
+					expects_invoke_arg('offset', 40)
+					Review.find(:page => 3)
+				end
+			end
+		
+			context "ordering parameters" do
+				should "send a by-title to the API for :title order" do
+					expects_invoke_arg('order', 'by-title')
+					Review.find(:order => :title)
+				end
+				
+				should "send a by-publication-date to the API for :publication_date order" do
+					expects_invoke_arg('order', 'by-publication-date')
+					Review.find(:order => :publication_date)
+				end
+				
+				should "send a by-opening-date to the API for :opening_date order" do
+					expects_invoke_arg('order', 'by-opening-date')
+					Review.find(:order => :opening_date)
+				end
+				
+				should "send a by-dvd-release-date to the API for :dvd_release_date order" do
+					expects_invoke_arg('order', 'by-dvd-release-date')
+					Review.find(:order => :dvd_release_date)
+				end
+				
+				should "raise an ArgumentError if the ordering is not one of those allowed" do
+					assert_raise(ArgumentError) do
+						Review.find(:order => :random)
+					end
+				end
 			end
 		end
 	end

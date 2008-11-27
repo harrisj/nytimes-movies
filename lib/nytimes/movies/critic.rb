@@ -30,7 +30,8 @@ module Nytimes
 					raise ArgumentError, "Type can be :full_time, :part_time, or :all"
 				end
 				
-				results = invoke("critics/#{key}")
+				reply = invoke("critics/#{key}")
+				results = reply['results']
 				results.map {|r| self.create_from_api(r)}
 			end
 			
@@ -41,8 +42,9 @@ module Nytimes
 			
 			def self.find_by_name(name)
 				name = escape_critic_name(name)
-				results = invoke("critics/#{name}")
-				return nil if results.nil?
+				reply = invoke("critics/#{name}")
+				return nil if reply.nil? || reply['results'].nil?
+				results = reply['results']
 				critics = results.map {|r| self.create_from_api(r)}
 				return critics.first if critics.length == 1
 				critics
