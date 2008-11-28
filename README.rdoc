@@ -1,26 +1,28 @@
 = nytimes-movies
 
-* FIX (url)
-
 == DESCRIPTION:
 
-FIX (describe your package)
+A gem for accessing the NY Times' Movie Reviews API (http://developer.nytimes.com/)
 
 == FEATURES/PROBLEMS:
 
-* FIX (list of features or problems)
+* Still under development.
 
 == SYNOPSIS:
 
-  FIX (code sample of usage)
+  include Nytimes::Movies
+	Base.api_key = 'YOUR API KEY'
+	reviews = Review.find(:dvd => true, :reviewer => 'A. O. Scott')
+	ao = Critic.find_by_name('A. O. Scott')
 
 == REQUIREMENTS:
 
-* FIX (list of requirements)
+* The JSON gem
+* An API key for the NY Times' Movies API
 
 == INSTALL:
 
-* FIX (sudo gem install, anything else)
+* sudo gem install nytimes-movies
 
 == LICENSE:
 
