@@ -37,7 +37,7 @@ module Nytimes
 				def format_date_arg(arg)
 					return arg if arg.is_a? String
 		
-					unless arg.responds_to? :strftime
+					unless arg.respond_to? :strftime
 						raise "Date argument must respond to strftime"
 					end
 					
@@ -45,7 +45,8 @@ module Nytimes
 				end
 				
 				def date_to_query_arg(date_or_range)
-					if date_or_range.responds_to?(:first) && date_or_range.responds_to?(:last)
+					return nil if date_or_range.nil?
+					if date_or_range.respond_to?(:first) && date_or_range.respond_to?(:last)
 						"#{format_date_arg(date_or_range.first)};#{format_date_arg(date_or_range.last)}"
 					else
 						format_date_arg(date_or_range)
@@ -53,7 +54,7 @@ module Nytimes
 				end
 				
 				def boolean_to_query_arg(arg)
-					return nil if arg.nil?
+					return nil if arg.nil?					
 					arg ? 'Y' : 'N'
 				end
 				
@@ -90,8 +91,9 @@ module Nytimes
 				# Find Movie Reviews that match your parameters. Up to 3 of the following query parameters can be used in a request:
 				#  
 				# * <tt>:text</tt> - search movie title and indexed terms for the movie. To limit to exact matches, enclose parts of the query in single quotes. Otherwise, it will include include partial matches ("head words") as well as exact matches (e.g., president will match president, presidents and presidential). Multiple terms will be ORed together
-				# * <tt>:critic_pick</tt> - set to true to only search movies that are designated critics picks. Should your tastes be more lowbrow, set to false to return movies that are specifically NOT critic's picks. To get all movies, don't send this parameter at all.
+				# * <tt>:critics_pick</tt> - set to true to only search movies that are designated critics picks. Should your tastes be more lowbrow, set to false to return movies that are specifically NOT critic's picks. To get all movies, don't send this parameter at all.
 				# * <tt>:thousand_best</tt> - search only movies on the Times List of "Thousand Best Movies Ever Made". Set to false if you want to explicitly search movies not on the list. Omit if you want all movies.
+				# * <tt>:dvd</tt> - if true, search only movies out on DVD. If false, movies not on DVD. Don't specify if you want all movies.
 				# * <tt>:reviewer</tt> - search reviews made by a specific critic. The full-name or the SEO name can be used to specify the critic.
 				# * <tt>:publication_date</tt> - when the review was published. This can be either a single Date or Time object or a range of Times (anything that responds to .first and .last). If you'd prefer, you can also pass in a "YYYY-MM-DD" string
 				# * <tt>:opening_date</tt> - when the movie opened in theaters in the NY Metro area. See +:publication_date+ for argument times.
@@ -102,30 +104,38 @@ module Nytimes
 				# * <tt>:order</tt> - ordering for the results. The following four sorting options are available: <tt>:title</tt> (<em>ascending</em>), <tt>:publication_date</tt>, <tt>:opening_date</tt>, <tt>:dvd_release_date</tt> (<em>most recent first</em>). If you do not specify a sort order, the results will be ordered by closest match.
 				def find(in_params={})
 					params = {}
-					in_params.each_pair do |k,v|
-						params[k.to_s] = v
+					
+					if in_params[:text]
+						params['query'] = in_params[:text]
+					end
+
+					params['thousand-best'] = boolean_to_query_arg(in_params[:thousand_best])
+					params['critics-pick'] = boolean_to_query_arg(in_params[:critics_pick])
+					params['dvd'] = boolean_to_query_arg(in_params[:dvd])
+					
+					params['publication-date'] = date_to_query_arg(in_params[:publication_date])
+					params['opening-date'] = date_to_query_arg(in_params[:opening_date])
+										
+					if in_params.has_key? :reviewer
+						params['reviewer'] = Critic.escape_critic_name(in_params[:reviewer])
 					end
 					
-					if text = params.delete('text')
-						params['query'] = text
+					params['offset'] = in_params[:offset]
+					
+					if in_params.has_key? :page
+						params['offset'] = BATCH_SIZE * (in_params[:page] - 1)
 					end
 					
-					unless params['reviewer'].nil?
-						params['reviewer'] = Critic.escape_critic_name(params['reviewer'])
-					end
-					
-					if page = params.delete('page')
-						params['offset'] = BATCH_SIZE * (page - 1)
-					end
-					
-					unless params['order'].nil?
-						params['order'] = case params['order']
+					if in_params.has_key? :order
+						params['order'] = case in_params[:order]
 						when :title, :publication_date, :opening_date, :dvd_release_date
-							"by-#{params['order'].to_s.gsub('_', '-')}"
+							"by-#{in_params[:order].to_s.gsub('_', '-')}"
 						else
 							raise ArgumentError, "Order can only be :title, :publication_date, :opening_date, or :dvd_release_date"
 						end
 					end
+					
+					params.delete_if {|k, v| v.nil? }
 					
 					reply = invoke 'reviews/search', params
 					ResultSet.new(reply['num_results'], params['offset'], reply['results'])			

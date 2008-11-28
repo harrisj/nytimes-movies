@@ -82,21 +82,71 @@ class TestNytimes::TestMovies::TestReview < Test::Unit::TestCase
 		end
 		
 		context "input parameters" do
-			context "text" do
+			%w(critics_pick dvd thousand_best).each do |flag|
+				context flag do
+					should "send Y if the #{flag} is true" do
+						expects_invoke_arg(flag.gsub('_','-'), 'Y')
+						Review.find(flag.to_sym => true)
+					end
+				
+					should "send N if the #{flag} is false" do
+						expects_invoke_arg(flag.gsub('_','-'), 'N')
+						Review.find(flag.to_sym => false)
+					end
+				end
+			end
+
+			%w(opening_date publication_date).each do |field|
+				context field do
+					should "accept a single Date object" do
+						d = Date.parse('1/1/2008')
+						expects_invoke_arg(field.gsub('_','-'), d.strftime('%Y-%m-%d'))
+						Review.find(field.to_sym => d)
+					end
+					
+					should "accept a single Time object" do
+						t = Time.parse('1/1/2008')
+						expects_invoke_arg(field.gsub('_','-'), t.strftime('%Y-%m-%d'))
+						Review.find(field.to_sym => t)	
+					end
+					
+					should "accept a range of Date objects" do
+						d1 = Date.parse('1/1/2008')
+						d2 = Date.parse('1/30/2008')
+						expects_invoke_arg(field.gsub('_','-'), "#{d1.strftime('%Y-%m-%d')};#{d2.strftime('%Y-%m-%d')}")
+						Review.find(field.to_sym => d1..d2)
+					end
+					
+					should "accept a range of Time objects" do
+						t1 = Time.parse('1/1/2008')
+						t2 = Time.parse('1/30/2008')
+						expects_invoke_arg(field.gsub('_','-'), "#{t1.strftime('%Y-%m-%d')};#{t2.strftime('%Y-%m-%d')}")
+						Review.find(field.to_sym => t1..t2)	
+					end
+					
+					should "accept an array of Date objects" do
+						d1 = Date.parse('1/1/2008')
+						d2 = Date.parse('1/30/2008')
+						expects_invoke_arg(field.gsub('_','-'), "#{d1.strftime('%Y-%m-%d')};#{d2.strftime('%Y-%m-%d')}")
+						Review.find(field.to_sym => [d1,d2])
+					end
+					
+					should "accept an array of Time objects" do
+						t1 = Time.parse('1/1/2008')
+						t2 = Time.parse('1/30/2008')
+						expects_invoke_arg(field.gsub('_','-'), "#{t1.strftime('%Y-%m-%d')};#{t2.strftime('%Y-%m-%d')}")
+						Review.find(field.to_sym => [t1,t2])
+					end
+				end
+			end
+
+			context "offset" do
+				should "send the offset argument through" do
+					expects_invoke_arg('offset', 60)
+					Review.find(:offset => 60)
+				end
 			end
 			
-			context "critic_name" do
-				should "escape the Critic Name to the SEO form" do
-					expects_invoke_arg('reviewer', 'a-o-scott')
-					Review.find(:reviewer => 'A. O. Scott')
-				end
-				
-				should "not escape again if already in SEO form" do
-					expects_invoke_arg('reviewer', 'a-o-scott')
-					Review.find(:reviewer => 'A. O. Scott')
-				end
-			end
-		
 			context "page" do
 				should "set the offset to be batchsize * page-1" do
 					expects_invoke_arg('offset', 40)
@@ -131,6 +181,18 @@ class TestNytimes::TestMovies::TestReview < Test::Unit::TestCase
 					end
 				end
 			end
+			
+			context "reviewer" do
+				should "escape the Critic Name to the SEO form" do
+					expects_invoke_arg('reviewer', 'a-o-scott')
+					Review.find(:reviewer => 'A. O. Scott')
+				end
+				
+				should "not escape again if already in SEO form" do
+					expects_invoke_arg('reviewer', 'a-o-scott')
+					Review.find(:reviewer => 'A. O. Scott')
+				end
+			end			
 		end
 	end
 end

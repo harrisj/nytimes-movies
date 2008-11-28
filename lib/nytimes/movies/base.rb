@@ -42,7 +42,7 @@ module Nytimes
 						
 						uri = build_request_url(path, full_params)
 						
-						puts "Request  [#{uri}]"
+						# puts "Request  [#{uri}]"
 						
 						reply = uri.read
 						parsed_reply = JSON.parse reply
