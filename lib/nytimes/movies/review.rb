@@ -2,7 +2,7 @@ module Nytimes
 	module Movies
 		class Review < Base
 			attr_reader :nyt_movie_id, :display_title, :sort_name, :mpaa_rating, :byline, :headline, :summary_short, :publication_date, :opening_date, :dvd_release_date, \
-			            :date_updated, :seo_name, :critics_pick, :thousand_best, :thumbnail, :link, :related_links
+			            :date_updated, :seo_name, :critics_pick, :thousand_best, :thumbnail, :link, :related_links, :critic
 			
 			alias :updated_on :date_updated
 			alias :critics_pick? :critics_pick
@@ -102,6 +102,7 @@ module Nytimes
 				# * <tt>:offset</tt> - a maximum of 20 result are returned for queries. To retrieve further pages, an offset from the first result can be specified. This must be a multiple of 20. So +20+ means results +21 - 40+
 				# * <tt>:page</tt> - as a convenience, page will calculate the offset for here. This is not an API parameter and is translated into an offset.
 				# * <tt>:order</tt> - ordering for the results. The following four sorting options are available: <tt>:title</tt> (<em>ascending</em>), <tt>:publication_date</tt>, <tt>:opening_date</tt>, <tt>:dvd_release_date</tt> (<em>most recent first</em>). If you do not specify a sort order, the results will be ordered by closest match.
+				# * <tt>:load_critics</tt> - if true, automatically load the Critic object for each record's reviewer. Note that this requires N additional API calls (where N is the unique number of critics in the result set)
 				def find(in_params={})
 					params = {}
 					
@@ -138,7 +139,25 @@ module Nytimes
 					params.delete_if {|k, v| v.nil? }
 					
 					reply = invoke 'reviews/search', params
-					ResultSet.new(reply['num_results'], params['offset'], reply['results'])			
+					out = ResultSet.new(params, reply, Review)			
+
+					if in_params[:load_critics]
+						critics_hash = {}
+						out.results.each do |r|
+							name = r.byline
+							
+							if critics_hash.has_key? name
+								critic = critics_hash[name]
+							else
+								critic = Critic.find_by_name(name)
+								critics_hash[name] = critic
+							end
+							
+							r.instance_variable_set '@critic', critic 
+						end
+					end	
+					
+					out				
 				end
 				
 				def find_by_type(params={})
