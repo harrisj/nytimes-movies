@@ -15,6 +15,8 @@ module Nytimes
 				Review.find(params.merge :reviewer => seo_name)
 			end
 			
+			##
+			# Create a Critic object from a hash snippet returned from the API. You should never need to call this.
 			def self.create_from_api(params={})
 				self.new :display_name => params['display_name'],
 								 :sort_name => params['sort_name'],

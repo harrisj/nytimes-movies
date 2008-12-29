@@ -28,6 +28,8 @@ module Nytimes
 				offset / batch_size + 1
 			end
 			
+			##
+			# The calculated number of pages returned from the movies API.
 			def num_pages
 				(num_results.to_f / batch_size).ceil
 			end
@@ -36,9 +38,6 @@ module Nytimes
 			# The number of results returned in a result set
 			def batch_size
 				Review::BATCH_SIZE
-			end
-			
-			def next_page
 			end
 			
 			alias per_page batch_size
